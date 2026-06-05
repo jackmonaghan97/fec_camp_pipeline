@@ -1,5 +1,3 @@
-# %%
-
 
 #!/usr/bin/env python3
 import requests, json, time, duckdb
@@ -12,14 +10,14 @@ PER_PAGE = 100
 TARGET = 100000
 STATE_PATH = Path("fetch_state.json")
 DB_PATH = r"C:\Users\jackm\OneDrive\Documents\duckdb_cli-windows-amd64\my_database.duckdb"
-TABLE = "spending"
-
+TABLE = "spending_test"
+		
 FIELDS = ",".join([
     'amendment_indicator', 'amendment_indicator_desc',       
     'beneficiary_committee_name', 'candidate_name',
     'candidate_office_description', 'candidate_office_state',
     'candidate_office_state_full', 'category_code_full', 
-    'comm_dt', 'committee', 'disbursement_amount',
+    'comm_dt', 'disbursement_amount',
     'disbursement_date', 'disbursement_description',
     'disbursement_purpose_category', 'disbursement_type_description',
     'entity_type_desc', 'fec_election_year',
@@ -27,7 +25,8 @@ FIELDS = ",".join([
     'payee_middle_name', 'payee_occupation',
     'recipient_city', 'recipient_name', 'recipient_state',
     'recipient_zip', 'spender_committee_designation',
-    'spender_committee_org_type', 'spender_committee_type'
+    'spender_committee_org_type', 'spender_committee_type',
+    'committee_id', 'committee_candidate_ids'
 ])
 COLS = [c.strip() for c in FIELDS.split(",")]
 FILTERS = {"two_year_transaction_period": 2020}
@@ -51,20 +50,18 @@ def ensure_table():
 def insert_rows(rows):
     
 
-    if not rows:
-        return
-    
-    for i in rows: {c: i.get(c) for c in COLS}
+    # keep only keys in COLS, in one line
+    rows = [{c: r.get(c) for c in COLS} for r in rows]
+
     try:
         con = duckdb.connect(DB_PATH)
         cols_order = COLS
         placeholders = ",".join(["?"] * len(cols_order))
-        con.executemany(f"INSERT INTO {TABLE} VALUES ({placeholders})",
-                        [[r.get(col) for col in cols_order] for r in rows])
+        insert_sql = f"INSERT INTO {TABLE} ({', '.join(cols_order)}) VALUES ({placeholders})"
+        con.executemany(insert_sql, [[r[c] for c in cols_order] for r in rows])
         con.close()
-
     except Exception as e:
-        BROKEN_ROWS.extend(rows)
+        BROKEN_ROWS.append(rows)
         print(f"Error occurred while inserting rows: {e}")
 
 def flatten_item(item):
@@ -140,5 +137,3 @@ if __name__ == "__main__":
     print(f"Starting fetch target={TARGET}")
     total = fetch_until(TARGET)
     print(f"Fetched and stored {total} rows into {DB_PATH}:{TABLE}")
-
-# %%
